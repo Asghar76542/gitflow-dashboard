@@ -4,9 +4,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { GitBranch, GitCommit, Star, History, Tag } from "lucide-react";
+import { GitBranch, GitCommit, Star, History, Tag, AlertTriangle } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Repository {
   id: string;
@@ -28,6 +38,8 @@ export function RepoManager() {
   const [selectedSourceRepo, setSelectedSourceRepo] = useState("");
   const [selectedTargetRepo, setSelectedTargetRepo] = useState("");
   const [lastAction, setLastAction] = useState<string>("");
+  const [showMasterWarning, setShowMasterWarning] = useState(false);
+  const [confirmationStep, setConfirmationStep] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -38,6 +50,7 @@ export function RepoManager() {
     e.preventDefault();
     
     if (!repoUrl) {
+      console.error("Repository URL is required");
       toast({
         title: "Error",
         description: "Please enter a repository URL",
@@ -55,6 +68,7 @@ export function RepoManager() {
       lastCommit: "Initial commit"
     };
 
+    console.log("Adding new repository:", { url: repoUrl, label: repoLabel });
     setRepositories(prev => [...prev, newRepo]);
     setRepoUrl("");
     setRepoLabel("");
@@ -67,6 +81,7 @@ export function RepoManager() {
 
   const handlePushRepo = () => {
     if (!selectedSourceRepo || !selectedTargetRepo) {
+      console.error("Source and target repositories must be selected");
       toast({
         title: "Error",
         description: "Please select both source and target repositories",
@@ -75,10 +90,22 @@ export function RepoManager() {
       return;
     }
 
-    const sourceRepo = repositories.find(r => r.id === selectedSourceRepo);
     const targetRepo = repositories.find(r => r.id === selectedTargetRepo);
+    
+    if (targetRepo?.isMaster && confirmationStep === 0) {
+      console.warn("Attempting to push to master repository - requiring confirmation");
+      setShowMasterWarning(true);
+      return;
+    }
 
-    // Simulate push operation
+    const sourceRepo = repositories.find(r => r.id === selectedSourceRepo);
+    
+    // Simulate push operation with detailed logging
+    console.log(`%cPush Operation Started`, 'color: blue; font-weight: bold');
+    console.log(`From: ${sourceRepo?.label || sourceRepo?.url}`);
+    console.log(`To: ${targetRepo?.label || targetRepo?.url}`);
+    console.log(`Type: ${pushType}`);
+
     const timestamp = new Date().toISOString();
     setRepositories(prev => prev.map(repo => {
       if (repo.id === selectedTargetRepo) {
@@ -87,15 +114,31 @@ export function RepoManager() {
       return repo;
     }));
 
-    setLastAction(`Pushed from ${sourceRepo?.label || sourceRepo?.url} to ${targetRepo?.label || targetRepo?.url} at ${new Date().toLocaleTimeString()}`);
+    const actionMessage = `Pushed from ${sourceRepo?.label || sourceRepo?.url} to ${targetRepo?.label || targetRepo?.url} at ${new Date().toLocaleTimeString()}`;
+    setLastAction(actionMessage);
+    console.log(`%cPush Operation Completed: ${actionMessage}`, 'color: green');
     
     toast({
       title: "Success",
       description: `Push completed with ${pushType} strategy`,
     });
+
+    // Reset confirmation state
+    setConfirmationStep(0);
+    setShowMasterWarning(false);
+  };
+
+  const handleMasterWarningConfirm = () => {
+    setConfirmationStep(prev => prev + 1);
+    if (confirmationStep < 2) {
+      console.warn(`Master push confirmation step ${confirmationStep + 1} of 3`);
+    } else {
+      handlePushRepo();
+    }
   };
 
   const toggleMaster = (id: string) => {
+    console.log("Toggling master repository:", id);
     setRepositories(prev => prev.map(repo => ({
       ...repo,
       isMaster: repo.id === id
@@ -252,6 +295,36 @@ export function RepoManager() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={showMasterWarning} onOpenChange={setShowMasterWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Warning: Pushing to Master Repository
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmationStep === 0 && "This is a master repository. Are you sure you want to proceed with the push operation?"}
+              {confirmationStep === 1 && "Please confirm again. This action will modify the master repository."}
+              {confirmationStep === 2 && "Final confirmation required. This action cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setConfirmationStep(0);
+              setShowMasterWarning(false);
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleMasterWarningConfirm}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              {confirmationStep === 2 ? "Confirm Push" : "Continue"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
