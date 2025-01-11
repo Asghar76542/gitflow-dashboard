@@ -4,12 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { GitBranch, GitCommit, Star, History } from "lucide-react";
+import { GitBranch, GitCommit, Star, History, Tag } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 
 interface Repository {
   id: string;
   url: string;
+  label?: string;
   isMaster: boolean;
   lastPushed?: string;
   lastCommit?: string;
@@ -21,6 +23,7 @@ export function RepoManager() {
     return saved ? JSON.parse(saved) : [];
   });
   const [repoUrl, setRepoUrl] = useState("");
+  const [repoLabel, setRepoLabel] = useState("");
   const [pushType, setPushType] = useState("regular");
   const [selectedSourceRepo, setSelectedSourceRepo] = useState("");
   const [selectedTargetRepo, setSelectedTargetRepo] = useState("");
@@ -46,17 +49,19 @@ export function RepoManager() {
     const newRepo: Repository = {
       id: crypto.randomUUID(),
       url: repoUrl,
-      isMaster: repositories.length === 0, // First repo added is master by default
+      label: repoLabel,
+      isMaster: repositories.length === 0,
       lastPushed: new Date().toISOString(),
       lastCommit: "Initial commit"
     };
 
     setRepositories(prev => [...prev, newRepo]);
     setRepoUrl("");
+    setRepoLabel("");
     
     toast({
       title: "Success",
-      description: `Repository added: ${repoUrl}`,
+      description: `Repository added: ${repoLabel || repoUrl}`,
     });
   };
 
@@ -70,6 +75,9 @@ export function RepoManager() {
       return;
     }
 
+    const sourceRepo = repositories.find(r => r.id === selectedSourceRepo);
+    const targetRepo = repositories.find(r => r.id === selectedTargetRepo);
+
     // Simulate push operation
     const timestamp = new Date().toISOString();
     setRepositories(prev => prev.map(repo => {
@@ -79,7 +87,7 @@ export function RepoManager() {
       return repo;
     }));
 
-    setLastAction(`Pushed from ${selectedSourceRepo} to ${selectedTargetRepo} at ${new Date().toLocaleTimeString()}`);
+    setLastAction(`Pushed from ${sourceRepo?.label || sourceRepo?.url} to ${targetRepo?.label || targetRepo?.url} at ${new Date().toLocaleTimeString()}`);
     
     toast({
       title: "Success",
@@ -115,6 +123,19 @@ export function RepoManager() {
           />
         </div>
 
+        <div className="space-y-2">
+          <label htmlFor="repoLabel" className="text-sm font-medium">
+            Repository Label (Optional)
+          </label>
+          <Input
+            id="repoLabel"
+            placeholder="e.g., Production, Staging, Feature-X"
+            value={repoLabel}
+            onChange={(e) => setRepoLabel(e.target.value)}
+            className="bg-background/50"
+          />
+        </div>
+
         <Button type="submit" className="w-full">
           Add Repository
         </Button>
@@ -133,7 +154,8 @@ export function RepoManager() {
               <SelectContent>
                 {repositories.map(repo => (
                   <SelectItem key={repo.id} value={repo.id}>
-                    {repo.url} {repo.isMaster && <Star className="inline h-4 w-4 ml-2" />}
+                    {repo.label || repo.url}
+                    {repo.isMaster && <Star className="inline h-4 w-4 ml-2 text-red-500" />}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -149,7 +171,8 @@ export function RepoManager() {
               <SelectContent>
                 {repositories.map(repo => (
                   <SelectItem key={repo.id} value={repo.id}>
-                    {repo.url} {repo.isMaster && <Star className="inline h-4 w-4 ml-2" />}
+                    {repo.label || repo.url}
+                    {repo.isMaster && <Star className="inline h-4 w-4 ml-2 text-red-500" />}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -184,12 +207,23 @@ export function RepoManager() {
           </h3>
           <div className="space-y-2">
             {repositories.map(repo => (
-              <div key={repo.id} className="flex items-center justify-between p-3 rounded-md bg-background/50">
+              <div 
+                key={repo.id} 
+                className={`flex items-center justify-between p-3 rounded-md transition-colors ${
+                  repo.isMaster ? 'bg-red-500/10 border border-red-500/20' : 'bg-background/50'
+                }`}
+              >
                 <div className="flex items-center gap-2">
-                  <GitCommit className="h-4 w-4 text-muted-foreground" />
+                  <GitCommit className={`h-4 w-4 ${repo.isMaster ? 'text-red-500' : 'text-muted-foreground'}`} />
                   <span className="text-sm">{repo.url}</span>
+                  {repo.label && (
+                    <Badge variant="secondary" className="flex items-center gap-1">
+                      <Tag className="h-3 w-3" />
+                      {repo.label}
+                    </Badge>
+                  )}
                   {repo.isMaster ? (
-                    <Star className="h-4 w-4 text-yellow-500" />
+                    <Star className="h-4 w-4 text-red-500" />
                   ) : (
                     <Button
                       variant="ghost"
