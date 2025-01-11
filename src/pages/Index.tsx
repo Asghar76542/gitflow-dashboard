@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { Header } from "@/components/Header";
 import { RepoManager } from "@/components/RepoManager";
 
 const Index = () => {
@@ -7,15 +8,14 @@ const Index = () => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
-        <main className="flex-1 p-6">
-          <div className="container mx-auto">
-            <div className="flex justify-between items-center mb-8">
-              <h1 className="text-3xl font-bold">Git Tools Dashboard</h1>
-              <SidebarTrigger />
+        <div className="flex-1">
+          <Header />
+          <main className="container p-6">
+            <div className="grid gap-6">
+              <RepoManager />
             </div>
-            <RepoManager />
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
     </SidebarProvider>
   );
