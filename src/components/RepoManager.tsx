@@ -1,12 +1,8 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { GitBranch, GitCommit, Star, History, Tag, AlertTriangle } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
+import { History } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,229 +13,226 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-interface Repository {
-  id: string;
-  url: string;
-  label?: string;
-  isMaster: boolean;
-  lastPushed?: string;
-  lastCommit?: string;
-}
+import { Input } from "@/components/ui/input";
+import { Repository, ConsoleLog, VerificationStatus } from "@/types/repository";
+import { RepositoryForm } from "./repository/RepositoryForm";
+import { RepositoryPushControls } from "./repository/RepositoryPushControls";
+import { RepositoryList } from "./repository/RepositoryList";
+import { ConsoleOutput } from "./repository/ConsoleOutput";
 
 export function RepoManager() {
-  const [repositories, setRepositories] = useState<Repository[]>(() => {
-    const saved = localStorage.getItem('git-repositories');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [repoUrl, setRepoUrl] = useState("");
-  const [repoLabel, setRepoLabel] = useState("");
-  const [pushType, setPushType] = useState("regular");
-  const [selectedSourceRepo, setSelectedSourceRepo] = useState("");
-  const [selectedTargetRepo, setSelectedTargetRepo] = useState("");
+  const [repositories, setRepositories] = useState<Repository[]>([]);
   const [lastAction, setLastAction] = useState<string>("");
-  const [showMasterWarning, setShowMasterWarning] = useState(false);
-  const [confirmationStep, setConfirmationStep] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [repoToDelete, setRepoToDelete] = useState<string | null>(null);
+  const [editingRepo, setEditingRepo] = useState<Repository | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    localStorage.setItem('git-repositories', JSON.stringify(repositories));
-  }, [repositories]);
+  const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
+  const [showConsole, setShowConsole] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<VerificationStatus>({ checking: false });
 
-  const handleAddRepo = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!repoUrl) {
-      console.error("Repository URL is required");
-      toast({
-        title: "Error",
-        description: "Please enter a repository URL",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const newRepo: Repository = {
-      id: crypto.randomUUID(),
-      url: repoUrl,
-      label: repoLabel,
-      isMaster: repositories.length === 0,
-      lastPushed: new Date().toISOString(),
-      lastCommit: "Initial commit"
-    };
-
-    console.log("Adding new repository:", { url: repoUrl, label: repoLabel });
-    setRepositories(prev => [...prev, newRepo]);
-    setRepoUrl("");
-    setRepoLabel("");
-    
-    toast({
-      title: "Success",
-      description: `Repository added: ${repoLabel || repoUrl}`,
-    });
+  const addConsoleLog = (message: string, type: 'error' | 'success' | 'info' = 'info') => {
+    setConsoleLogs(prev => [...prev, {
+      message,
+      type,
+      timestamp: new Date().toLocaleTimeString()
+    }]);
   };
 
-  const handlePushRepo = () => {
-    if (!selectedSourceRepo || !selectedTargetRepo) {
-      console.error("Source and target repositories must be selected");
-      toast({
-        title: "Error",
-        description: "Please select both source and target repositories",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const targetRepo = repositories.find(r => r.id === selectedTargetRepo);
-    
-    if (targetRepo?.isMaster && confirmationStep === 0) {
-      console.warn("Attempting to push to master repository - requiring confirmation");
-      setShowMasterWarning(true);
-      return;
-    }
-
-    const sourceRepo = repositories.find(r => r.id === selectedSourceRepo);
-    
-    // Simulate push operation with detailed logging
-    console.log(`%cPush Operation Started`, 'color: blue; font-weight: bold');
-    console.log(`From: ${sourceRepo?.label || sourceRepo?.url}`);
-    console.log(`To: ${targetRepo?.label || targetRepo?.url}`);
-    console.log(`Type: ${pushType}`);
-
-    const timestamp = new Date().toISOString();
-    setRepositories(prev => prev.map(repo => {
-      if (repo.id === selectedTargetRepo) {
-        return { ...repo, lastPushed: timestamp };
-      }
-      return repo;
+  const transformRepositoryData = (data: any[]): Repository[] => {
+    return data.map(repo => ({
+      id: repo.id,
+      url: repo.url,
+      name: repo.name,
+      nickname: repo.nickname,
+      is_master: repo.is_master,
+      last_sync: repo.last_sync,
+      status: repo.status,
+      last_commit: repo.last_commit,
+      last_commit_date: repo.last_commit_date,
+      default_branch: repo.default_branch,
+      branches: Array.isArray(repo.branches) ? repo.branches : [],
+      recent_commits: Array.isArray(repo.recent_commits) ? repo.recent_commits : []
     }));
-
-    const actionMessage = `Pushed from ${sourceRepo?.label || sourceRepo?.url} to ${targetRepo?.label || targetRepo?.url} at ${new Date().toLocaleTimeString()}`;
-    setLastAction(actionMessage);
-    console.log(`%cPush Operation Completed: ${actionMessage}`, 'color: green');
-    
-    toast({
-      title: "Success",
-      description: `Push completed with ${pushType} strategy`,
-    });
-
-    // Reset confirmation state
-    setConfirmationStep(0);
-    setShowMasterWarning(false);
   };
 
-  const handleMasterWarningConfirm = () => {
-    setConfirmationStep(prev => prev + 1);
-    if (confirmationStep < 2) {
-      console.warn(`Master push confirmation step ${confirmationStep + 1} of 3`);
-    } else {
-      handlePushRepo();
+  useEffect(() => {
+    fetchRepositories();
+  }, []);
+
+  const fetchRepositories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('repositories')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      const transformedData = transformRepositoryData(data || []);
+      setRepositories(transformedData);
+    } catch (error) {
+      console.error('Error fetching repositories:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch repositories",
+        variant: "destructive",
+      });
     }
   };
 
-  const toggleMaster = (id: string) => {
-    console.log("Toggling master repository:", id);
-    setRepositories(prev => prev.map(repo => ({
-      ...repo,
-      isMaster: repo.id === id
-    })));
+  const handleDeleteRepo = async (id: string) => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase
+        .from('repositories')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setRepositories(prev => prev.filter(repo => repo.id !== id));
+      
+      toast({
+        title: "Success",
+        description: "Repository deleted successfully",
+      });
+    } catch (error) {
+      console.error('Error deleting repository:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete repository",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      setShowDeleteConfirm(false);
+      setRepoToDelete(null);
+    }
+  };
+
+  const handleUpdateLabel = async (id: string, newLabel: string) => {
+    try {
+      setIsLoading(true);
+      const { error } = await supabase
+        .from('repositories')
+        .update({ nickname: newLabel })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setRepositories(prev => prev.map(repo => 
+        repo.id === id ? { ...repo, nickname: newLabel } : repo
+      ));
+      
+      toast({
+        title: "Success",
+        description: "Repository label updated successfully",
+      });
+    } catch (error) {
+      console.error('Error updating repository label:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update repository label",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+      setEditingRepo(null);
+    }
+  };
+
+  const refreshLastCommit = async (id: string) => {
+    try {
+      setIsLoading(true);
+      await supabase.functions.invoke('git-operations', {
+        body: {
+          type: 'getLastCommit',
+          sourceRepoId: id
+        }
+      });
+
+      await fetchRepositories();
+      
+      toast({
+        title: "Success",
+        description: "Repository information updated",
+      });
+    } catch (error) {
+      console.error('Error refreshing repository:', error);
+      toast({
+        title: "Error",
+        description: "Failed to refresh repository information",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleMaster = async (id: string) => {
+    try {
+      setIsLoading(true);
+      
+      // Update all repositories to not be master
+      await supabase
+        .from('repositories')
+        .update({ is_master: false })
+        .neq('id', id);
+
+      // Set the selected repository as master
+      const { error } = await supabase
+        .from('repositories')
+        .update({ is_master: true })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await fetchRepositories();
+      
+      toast({
+        title: "Success",
+        description: "Master repository updated",
+      });
+    } catch (error) {
+      console.error('Error toggling master repository:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update master repository",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <Card className="p-6 space-y-6 bg-secondary/50 backdrop-blur-sm">
-      <div className="flex items-center gap-2 mb-6">
-        <GitBranch className="h-6 w-6 text-primary" />
-        <h2 className="text-2xl font-semibold">Repository Manager</h2>
-      </div>
-      
-      <form onSubmit={handleAddRepo} className="space-y-4">
-        <div className="space-y-2">
-          <label htmlFor="repoUrl" className="text-sm font-medium">
-            Repository URL
-          </label>
-          <Input
-            id="repoUrl"
-            placeholder="https://github.com/username/repo.git"
-            value={repoUrl}
-            onChange={(e) => setRepoUrl(e.target.value)}
-            className="bg-background/50"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="repoLabel" className="text-sm font-medium">
-            Repository Label (Optional)
-          </label>
-          <Input
-            id="repoLabel"
-            placeholder="e.g., Production, Staging, Feature-X"
-            value={repoLabel}
-            onChange={(e) => setRepoLabel(e.target.value)}
-            className="bg-background/50"
-          />
-        </div>
-
-        <Button type="submit" className="w-full">
-          Add Repository
-        </Button>
-      </form>
+      <RepositoryForm onRepositoryAdded={fetchRepositories} />
 
       <div className="space-y-4 pt-4 border-t border-border/50">
-        <h3 className="text-lg font-medium">Push Repository</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Source Repository</label>
-            <Select value={selectedSourceRepo} onValueChange={setSelectedSourceRepo}>
-              <SelectTrigger className="bg-background/50">
-                <SelectValue placeholder="Select source repository" />
-              </SelectTrigger>
-              <SelectContent>
-                {repositories.map(repo => (
-                  <SelectItem key={repo.id} value={repo.id}>
-                    {repo.label || repo.url}
-                    {repo.isMaster && <Star className="inline h-4 w-4 ml-2 text-red-500" />}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <RepositoryPushControls
+          repositories={repositories}
+          onPushComplete={fetchRepositories}
+          onVerificationComplete={setVerificationStatus}
+          addConsoleLog={addConsoleLog}
+          isLoading={isLoading}
+          setIsLoading={setIsLoading}
+        />
+
+        {verificationStatus.message && (
+          <div className={`p-4 rounded-md ${
+            verificationStatus.checking ? 'bg-blue-500/10 border border-blue-500/20' :
+            verificationStatus.success ? 'bg-green-500/10 border border-green-500/20' :
+            'bg-red-500/10 border border-red-500/20'
+          }`}>
+            <p className="text-sm">
+              {verificationStatus.message}
+            </p>
           </div>
-
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Target Repository</label>
-            <Select value={selectedTargetRepo} onValueChange={setSelectedTargetRepo}>
-              <SelectTrigger className="bg-background/50">
-                <SelectValue placeholder="Select target repository" />
-              </SelectTrigger>
-              <SelectContent>
-                {repositories.map(repo => (
-                  <SelectItem key={repo.id} value={repo.id}>
-                    {repo.label || repo.url}
-                    {repo.isMaster && <Star className="inline h-4 w-4 ml-2 text-red-500" />}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Push Type</label>
-          <Select value={pushType} onValueChange={setPushType}>
-            <SelectTrigger className="bg-background/50">
-              <SelectValue placeholder="Select push type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="regular">Regular Push</SelectItem>
-              <SelectItem value="force">Force Push</SelectItem>
-              <SelectItem value="force-with-lease">Force with Lease</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button onClick={handlePushRepo} className="w-full">
-          Push Repository
-        </Button>
+        )}
       </div>
 
       {repositories.length > 0 && (
@@ -248,42 +241,17 @@ export function RepoManager() {
             <History className="h-5 w-5" />
             Repository History
           </h3>
-          <div className="space-y-2">
-            {repositories.map(repo => (
-              <div 
-                key={repo.id} 
-                className={`flex items-center justify-between p-3 rounded-md transition-colors ${
-                  repo.isMaster ? 'bg-red-500/10 border border-red-500/20' : 'bg-background/50'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <GitCommit className={`h-4 w-4 ${repo.isMaster ? 'text-red-500' : 'text-muted-foreground'}`} />
-                  <span className="text-sm">{repo.url}</span>
-                  {repo.label && (
-                    <Badge variant="secondary" className="flex items-center gap-1">
-                      <Tag className="h-3 w-3" />
-                      {repo.label}
-                    </Badge>
-                  )}
-                  {repo.isMaster ? (
-                    <Star className="h-4 w-4 text-red-500" />
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleMaster(repo.id)}
-                      className="text-xs"
-                    >
-                      Set as Master
-                    </Button>
-                  )}
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  Last pushed: {repo.lastPushed ? new Date(repo.lastPushed).toLocaleString() : 'Never'}
-                </span>
-              </div>
-            ))}
-          </div>
+          <RepositoryList
+            repositories={repositories}
+            onToggleMaster={toggleMaster}
+            onRefresh={refreshLastCommit}
+            onEdit={setEditingRepo}
+            onDelete={(id) => {
+              setRepoToDelete(id);
+              setShowDeleteConfirm(true);
+            }}
+            isLoading={isLoading}
+          />
         </div>
       )}
 
@@ -296,31 +264,58 @@ export function RepoManager() {
         </div>
       )}
 
-      <AlertDialog open={showMasterWarning} onOpenChange={setShowMasterWarning}>
+      <ConsoleOutput
+        showConsole={showConsole}
+        onToggleConsole={() => setShowConsole(!showConsole)}
+        logs={consoleLogs}
+      />
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              Warning: Pushing to Master Repository
-            </AlertDialogTitle>
+            <AlertDialogTitle>Delete Repository</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmationStep === 0 && "This is a master repository. Are you sure you want to proceed with the push operation?"}
-              {confirmationStep === 1 && "Please confirm again. This action will modify the master repository."}
-              {confirmationStep === 2 && "Final confirmation required. This action cannot be undone."}
+              Are you sure you want to delete this repository? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
-              setConfirmationStep(0);
-              setShowMasterWarning(false);
+              setShowDeleteConfirm(false);
+              setRepoToDelete(null);
             }}>
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleMasterWarningConfirm}
+              onClick={() => repoToDelete && handleDeleteRepo(repoToDelete)}
               className="bg-red-500 hover:bg-red-600"
             >
-              {confirmationStep === 2 ? "Confirm Push" : "Continue"}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!editingRepo} onOpenChange={(open) => !open && setEditingRepo(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Edit Repository Label</AlertDialogTitle>
+            <AlertDialogDescription>
+              <Input
+                value={editingRepo?.nickname || ''}
+                onChange={(e) => setEditingRepo(prev => prev ? {...prev, nickname: e.target.value} : null)}
+                placeholder="Enter new label"
+                className="mt-2"
+              />
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setEditingRepo(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => editingRepo && handleUpdateLabel(editingRepo.id, editingRepo.nickname || '')}
+            >
+              Save
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

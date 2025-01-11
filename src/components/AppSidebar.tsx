@@ -1,4 +1,4 @@
-import { GitBranch, GitCommit, GitMerge, GitPullRequest, Settings } from "lucide-react";
+import { GitBranch, GitCommit, GitMerge, GitPullRequest, Settings, Code2 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -30,6 +30,11 @@ const items = [
     title: "Merge",
     url: "/merge",
     icon: GitMerge,
+  },
+  {
+    title: "Web Dev Tools",
+    url: "/web-tools",
+    icon: Code2,
   },
   {
     title: "Settings",
