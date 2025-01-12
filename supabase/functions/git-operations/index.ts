@@ -87,19 +87,53 @@ async function getRepoDetails(url: string, octokit: Octokit) {
   }
 }
 
-async function verifyCommitExists(octokit: Octokit, owner: string, repo: string, sha: string) {
+async function copyCommitToRepo(octokit: Octokit, sourceOwner: string, sourceRepo: string, targetOwner: string, targetRepo: string, sha: string) {
+  const logs = [];
   try {
-    await octokit.rest.git.getCommit({
-      owner,
-      repo,
+    // Get the commit from source repository
+    logs.push(log.info('Fetching commit from source repository', { sha }));
+    const sourceCommit = await octokit.rest.git.getCommit({
+      owner: sourceOwner,
+      repo: sourceRepo,
       commit_sha: sha
     });
-    return true;
+
+    // Get the tree from source repository
+    logs.push(log.info('Fetching tree from source repository'));
+    const sourceTree = await octokit.rest.git.getTree({
+      owner: sourceOwner,
+      repo: sourceRepo,
+      tree_sha: sourceCommit.data.tree.sha,
+      recursive: 'true'
+    });
+
+    // Create the tree in target repository
+    logs.push(log.info('Creating tree in target repository'));
+    const targetTree = await octokit.rest.git.createTree({
+      owner: targetOwner,
+      repo: targetRepo,
+      tree: sourceTree.data.tree
+    });
+
+    // Create the commit in target repository
+    logs.push(log.info('Creating commit in target repository'));
+    const targetCommit = await octokit.rest.git.createCommit({
+      owner: targetOwner,
+      repo: targetRepo,
+      message: sourceCommit.data.message,
+      tree: targetTree.data.sha,
+      parents: sourceCommit.data.parents.map(p => p.sha)
+    });
+
+    logs.push(log.success('Commit copied successfully', { 
+      sourceSha: sha,
+      targetSha: targetCommit.data.sha 
+    }));
+
+    return { logs, sha: targetCommit.data.sha };
   } catch (error) {
-    if (error.status === 404) {
-      return false;
-    }
-    throw error;
+    logs.push(log.error('Error copying commit', error));
+    throw { error, logs };
   }
 }
 
@@ -107,27 +141,6 @@ async function ensureRef(octokit: Octokit, owner: string, repo: string, ref: str
   const logs = [];
   try {
     logs.push(log.info('Ensuring reference exists', { owner, repo, ref, sha, force }));
-    
-    // First verify the commit exists in the target repository
-    const commitExists = await verifyCommitExists(octokit, owner, repo, sha);
-    if (!commitExists) {
-      logs.push(log.info('Commit does not exist in target repository, fetching it', { sha }));
-      
-      // Get the commit from source repository and create it in target
-      const commit = await octokit.rest.git.getCommit({
-        owner,
-        repo,
-        commit_sha: sha
-      });
-      
-      await octokit.rest.git.createCommit({
-        owner,
-        repo,
-        message: commit.data.message,
-        tree: commit.data.tree.sha,
-        parents: commit.data.parents.map(p => p.sha)
-      });
-    }
     
     let refData = null;
     try {
@@ -257,17 +270,30 @@ serve(async (req) => {
         date: sourceCommit.date
       }));
 
+      const { owner: sourceOwner, repo: sourceRepoName } = parseGitHubUrl(sourceRepo.url);
       const { owner: targetOwner, repo: targetRepoName } = parseGitHubUrl(targetRepo.url);
-      const branchRef = `refs/heads/${targetRepo.default_branch || 'main'}`;
       
       try {
+        // Copy the commit to target repository
+        const { sha: targetSha, logs: copyLogs } = await copyCommitToRepo(
+          octokit,
+          sourceOwner,
+          sourceRepoName,
+          targetOwner,
+          targetRepoName,
+          sourceCommit.sha
+        );
+        logs.push(...copyLogs);
+
+        // Update or create the reference
+        const branchRef = `refs/heads/${targetRepo.default_branch || 'main'}`;
         const useForce = pushType === 'force' || pushType === 'force-with-lease';
         const result = await ensureRef(
           octokit,
           targetOwner,
           targetRepoName,
           branchRef,
-          sourceCommit.sha,
+          targetSha,
           useForce
         );
 
