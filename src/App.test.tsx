@@ -2,37 +2,39 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
-
-jest.mock('d3', () => ({
-  select: jest.fn(),
-  scaleLinear: jest.fn(),
-  axisBottom: jest.fn(),
-  axisLeft: jest.fn()
-}));
+import { BrowserRouter } from 'react-router-dom';
 
 describe('App Component', () => {
+  const renderApp = () => {
+    return render(
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    );
+  };
+
   test('renders repositories link', () => {
-    render(<App />);
+    renderApp();
     const linkElement = screen.getByRole('link', { name: /Repositories/i });
     expect(linkElement).toBeInTheDocument();
   });
 
   test('renders web tools link', () => {
-    render(<App />);
-    const linkElement = screen.getByRole('link', { name: /Web Tools/i });
+    renderApp();
+    const linkElement = screen.getByRole('link', { name: /Web Dev Tools/i });
     expect(linkElement).toBeInTheDocument();
   });
 
   test('navigates between pages', async () => {
-    render(<App />);
+    renderApp();
     
     // Click Web Tools link
-    const webToolsLink = screen.getByRole('link', { name: /Web Tools/i });
+    const webToolsLink = screen.getByRole('link', { name: /Web Dev Tools/i });
     await userEvent.click(webToolsLink);
     
     // Verify Web Tools page content
     await waitFor(() => {
-      expect(screen.getByText(/Web Performance Metrics/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /Web Development Tools/i })).toBeInTheDocument();
     });
 
     // Click Repositories link
@@ -41,12 +43,14 @@ describe('App Component', () => {
     
     // Verify Repositories page content
     await waitFor(() => {
-      expect(screen.getByText(/Repository Management/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /Git Repository Manager/i })).toBeInTheDocument();
     });
   });
 
-  test('renders loading state', () => {
-    render(<App />);
-    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+  test('renders sidebar toggle button on mobile', () => {
+    renderApp();
+    const toggleButton = screen.getByRole('button', { name: /toggle sidebar/i });
+    expect(toggleButton).toBeInTheDocument();
+    expect(toggleButton).toHaveClass('md:hidden');
   });
 });
