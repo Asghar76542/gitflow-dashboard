@@ -8,6 +8,8 @@ import { MonitoringPanel } from "@/components/web-tools/MonitoringPanel";
 import { UrlHistory } from "@/components/web-tools/UrlHistory";
 import { useToast } from "@/components/ui/use-toast";
 import { analyzeWebsite } from "@/utils/websiteAnalyzer";
+import { AppSidebar } from "@/components/AppSidebar";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 
 const MAX_HISTORY = 5;
 const URL_HISTORY_KEY = 'url-history';
@@ -58,30 +60,40 @@ export default function WebTools() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2">
-          <WebMetricsForm onAnalyze={handleAnalyze} isLoading={isAnalyzing} />
-        </div>
-        <div>
-          <UrlHistory urls={urlHistory} onSelectUrl={handleAnalyze} />
-        </div>
-      </div>
-
-      {metrics.length > 0 && (
-        <div className="space-y-8">
-          <MetricsDisplay metrics={metrics} />
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <DetailedWebMetricsD3 data={metrics} />
-            <DetailedWebMetricsHighcharts data={metrics} />
+    <div className="min-h-screen flex w-full">
+      <AppSidebar />
+      <main className="flex-1 p-6">
+        <div className="container mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold">Web Development Tools</h1>
+            <SidebarTrigger className="md:hidden" />
           </div>
           
-          <DetailedWebMetricsP5 data={metrics} />
-          
-          <MonitoringPanel isMonitoring={isMonitoring} onToggleMonitoring={toggleMonitoring} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+              <WebMetricsForm onAnalyze={handleAnalyze} isLoading={isAnalyzing} />
+            </div>
+            <div>
+              <UrlHistory urls={urlHistory} onSelectUrl={handleAnalyze} />
+            </div>
+          </div>
+
+          {metrics.length > 0 && (
+            <div className="space-y-8 mt-8">
+              <MetricsDisplay metrics={metrics} />
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <DetailedWebMetricsD3 data={metrics} />
+                <DetailedWebMetricsHighcharts data={metrics} />
+              </div>
+              
+              <DetailedWebMetricsP5 data={metrics} />
+              
+              <MonitoringPanel isMonitoring={isMonitoring} onToggleMonitoring={toggleMonitoring} />
+            </div>
+          )}
         </div>
-      )}
+      </main>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { GitBranch, GitCommit, GitMerge, GitPullRequest, Settings, Code2 } from "lucide-react";
+import { GitBranch, Code2 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -9,6 +9,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { useLocation } from "react-router-dom";
 
 const items = [
   {
@@ -17,43 +18,29 @@ const items = [
     icon: GitBranch,
   },
   {
-    title: "Push Operations",
-    url: "/push",
-    icon: GitCommit,
-  },
-  {
-    title: "Pull Requests",
-    url: "/pull-requests",
-    icon: GitPullRequest,
-  },
-  {
-    title: "Merge",
-    url: "/merge",
-    icon: GitMerge,
-  },
-  {
     title: "Web Dev Tools",
     url: "/web-tools",
     icon: Code2,
   },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-  },
 ];
 
 export function AppSidebar() {
+  const location = useLocation();
+  
   return (
     <Sidebar>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Git Tools</SidebarGroupLabel>
+          <SidebarGroupLabel>Dev Tools</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location.pathname === item.url || 
+                            (location.pathname === "/repositories" && item.url === "/")}
+                  >
                     <a href={item.url} className="flex items-center gap-3">
                       <item.icon className="h-5 w-5" />
                       <span>{item.title}</span>
