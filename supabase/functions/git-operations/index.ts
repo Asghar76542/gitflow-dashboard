@@ -94,23 +94,22 @@ async function ensureRef(octokit: Octokit, owner: string, repo: string, ref: str
     
     let refExists = false;
     try {
-      // Try to get the reference first
-      await octokit.rest.git.getRef({
+      const { data } = await octokit.rest.git.getRef({
         owner,
         repo,
         ref: ref.replace('refs/', '')
       });
       refExists = true;
+      logs.push(log.info('Reference check successful', { ref, exists: true }));
     } catch (error) {
       if (error.status !== 404) {
         throw error;
       }
-      // 404 means ref doesn't exist, which is fine - we'll create it
+      logs.push(log.info('Reference does not exist', { ref }));
     }
 
     if (refExists) {
-      // If reference exists, update it
-      logs.push(log.info('Reference exists, updating it', { ref, force }));
+      logs.push(log.info('Updating existing reference', { ref, sha, force }));
       const updateResponse = await octokit.rest.git.updateRef({
         owner,
         repo,
@@ -118,19 +117,16 @@ async function ensureRef(octokit: Octokit, owner: string, repo: string, ref: str
         sha,
         force
       });
-      
       logs.push(log.success('Reference updated successfully', { ref: updateResponse.data.ref }));
       return updateResponse;
     } else {
-      // Reference doesn't exist, create it
-      logs.push(log.info('Reference does not exist, creating it', { ref }));
+      logs.push(log.info('Creating new reference', { ref, sha }));
       const createResponse = await octokit.rest.git.createRef({
         owner,
         repo,
         ref,
         sha
       });
-      
       logs.push(log.success('Reference created successfully', { ref: createResponse.data.ref }));
       return createResponse;
     }
@@ -156,7 +152,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Create operation log entry
     const { data: operationLog, error: logError } = await supabaseClient
       .from('git_operations_log')
       .insert({
@@ -187,7 +182,6 @@ serve(async (req) => {
     if (type === 'push') {
       logs.push(log.info('Starting Git push operation', { sourceRepoId, targetRepoId, pushType }));
       
-      // Fetch source and target repo details
       const { data: sourceRepo } = await supabaseClient
         .from('repositories')
         .select('*')
@@ -210,7 +204,6 @@ serve(async (req) => {
         target: { url: targetRepo.url, branch: targetRepo.default_branch }
       }));
 
-      // Get latest commit from source
       const sourceDetails = await getRepoDetails(sourceRepo.url, octokit);
       logs.push(...sourceDetails.logs);
 
@@ -226,7 +219,6 @@ serve(async (req) => {
         date: sourceCommit.date
       }));
 
-      // Update target repository
       const { owner: targetOwner, repo: targetRepoName } = parseGitHubUrl(targetRepo.url);
       const branchRef = `refs/heads/${targetRepo.default_branch || 'main'}`;
       
@@ -247,7 +239,6 @@ serve(async (req) => {
           sha: result.data.object.sha
         }));
 
-        // Update repository status in database
         await supabaseClient
           .from('repositories')
           .update({
@@ -258,7 +249,6 @@ serve(async (req) => {
           })
           .eq('id', targetRepoId);
 
-        // Update operation log
         await supabaseClient
           .from('git_operations_log')
           .update({
@@ -273,7 +263,6 @@ serve(async (req) => {
       } catch (error) {
         logs.push(log.error('Push operation failed', error));
         
-        // Update operation log with error
         await supabaseClient
           .from('git_operations_log')
           .update({
