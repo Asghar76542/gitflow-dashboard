@@ -6,9 +6,15 @@ interface DetailedWebMetricsHighchartsProps {
   data: Array<{ metric: string; value: string }>;
 }
 
-export const DetailedWebMetricsHighcharts = ({ data }: DetailedWebMetricsHighchartsProps) => {
+export const DetailedWebMetricsHighcharts = ({ data = [] }: DetailedWebMetricsHighchartsProps) => {
+  // Handle null or undefined data
+  if (!data) {
+    console.error('DetailedWebMetricsHighcharts: Invalid data provided');
+    data = [];
+  }
+
   const presenceData = data.filter(d => 
-    d.value === 'Present' || d.value === 'Missing' || d.value === 'Yes' || d.value === 'No'
+    d?.value === 'Present' || d?.value === 'Missing' || d?.value === 'Yes' || d?.value === 'No'
   ).map(d => ({
     name: d.metric,
     y: d.value === 'Present' || d.value === 'Yes' ? 1 : 0,
@@ -30,6 +36,14 @@ export const DetailedWebMetricsHighcharts = ({ data }: DetailedWebMetricsHighcha
       pointFormat: '<b>{point.name}</b><br>Status: {point.status}<br>Percentage: {point.percentage:.1f}%'
     },
     accessibility: {
+      announceNewData: {
+        announcementFormatter: function (allSeries, newSeries, newPoint) {
+          if (newPoint) {
+            return 'New point added: ' + newPoint.name;
+          }
+          return false;
+        }
+      },
       point: {
         valueSuffix: '%'
       }
