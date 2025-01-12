@@ -4,6 +4,7 @@ import { GitCommit, Star, RefreshCw, Edit2, Trash2, GitBranch, GitMerge } from "
 import { Badge } from "@/components/ui/badge";
 import { Tag } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface RepositoryListProps {
   repositories: Repository[];
@@ -22,72 +23,101 @@ export function RepositoryList({
   onDelete,
   isLoading
 }: RepositoryListProps) {
+  const hasChanges = repositories.some(repo => repo.status === 'changed');
+
+  const handleRefreshAll = () => {
+    repositories.forEach(repo => onRefresh(repo.id));
+  };
+
   return (
-    <div className="space-y-2">
-      {repositories.map(repo => (
-        <div 
-          key={repo.id} 
-          className={`flex flex-col p-3 rounded-md transition-colors ${
-            repo.is_master ? 'bg-red-500/10 border border-red-500/20' : 'bg-background/50'
-          }`}
+    <div className="space-y-4">
+      <div className="flex justify-end mb-4">
+        <Button 
+          onClick={handleRefreshAll}
+          disabled={isLoading}
+          variant={hasChanges ? "destructive" : "secondary"}
+          className="gap-2"
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <GitCommit className={`h-4 w-4 ${repo.is_master ? 'text-red-500' : 'text-muted-foreground'}`} />
-              <span className="text-sm">{repo.url}</span>
-              {repo.nickname && (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  <Tag className="h-3 w-3" />
-                  {repo.nickname}
-                </Badge>
-              )}
-              {repo.is_master ? (
-                <Star className="h-4 w-4 text-red-500" />
-              ) : (
+          <RefreshCw className={cn(
+            "h-4 w-4",
+            isLoading && "animate-spin"
+          )} />
+          Refresh All
+          {hasChanges && <Badge variant="outline" className="ml-2">Changes Detected</Badge>}
+        </Button>
+      </div>
+
+      <div className="space-y-2">
+        {repositories.map(repo => (
+          <div 
+            key={repo.id} 
+            className={`flex flex-col p-3 rounded-md transition-colors ${
+              repo.is_master ? 'bg-red-500/10 border border-red-500/20' : 'bg-background/50'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <GitCommit className={`h-4 w-4 ${repo.is_master ? 'text-red-500' : 'text-muted-foreground'}`} />
+                <span className="text-sm">{repo.url}</span>
+                {repo.nickname && (
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Tag className="h-3 w-3" />
+                    {repo.nickname}
+                  </Badge>
+                )}
+              </div>
+              
+              <div className="flex items-center gap-2">
+                {repo.is_master ? (
+                  <Star className="h-4 w-4 text-red-500" />
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onToggleMaster(repo.id)}
+                    className="text-xs"
+                    disabled={isLoading}
+                  >
+                    Set as Master
+                  </Button>
+                )}
                 <Button
-                  variant="ghost"
+                  variant="secondary"
                   size="sm"
-                  onClick={() => onToggleMaster(repo.id)}
+                  onClick={() => onRefresh(repo.id)}
+                  className={cn(
+                    "text-xs",
+                    repo.status === 'changed' && "bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30"
+                  )}
+                  disabled={isLoading}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Refresh
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEdit(repo)}
                   className="text-xs"
                   disabled={isLoading}
                 >
-                  Set as Master
+                  <Edit2 className="h-3 w-3 mr-1" />
+                  Edit
                 </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onRefresh(repo.id)}
-                className="text-xs"
-                disabled={isLoading}
-              >
-                <RefreshCw className="h-3 w-3 mr-1" />
-                Refresh
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onEdit(repo)}
-                className="text-xs"
-                disabled={isLoading}
-              >
-                <Edit2 className="h-3 w-3 mr-1" />
-                Edit
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onDelete(repo.id)}
-                className="text-xs text-destructive"
-                disabled={isLoading}
-              >
-                <Trash2 className="h-3 w-3 mr-1" />
-                Delete
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onDelete(repo.id)}
+                  className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                  disabled={isLoading}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Delete
+                </Button>
+              </div>
             </div>
-          </div>
 
-          <div className="mt-4 text-xs text-muted-foreground space-y-2">
+            <div className="mt-4 text-xs text-muted-foreground space-y-2">
             <div className="flex items-center gap-2">
               <GitBranch className="h-3 w-3" />
               Default branch: {repo.default_branch || 'Unknown'}
@@ -128,9 +158,10 @@ export function RepositoryList({
             )}
 
             <div>Last synced: {repo.last_sync ? new Date(repo.last_sync).toLocaleString() : 'Never'}</div>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
