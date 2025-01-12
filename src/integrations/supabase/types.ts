@@ -9,6 +9,60 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      git_operations_log: {
+        Row: {
+          commit_hash: string | null
+          completed_at: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          operation_type: string
+          push_type: string | null
+          source_repo_id: string | null
+          status: string
+          target_repo_id: string | null
+        }
+        Insert: {
+          commit_hash?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          operation_type: string
+          push_type?: string | null
+          source_repo_id?: string | null
+          status: string
+          target_repo_id?: string | null
+        }
+        Update: {
+          commit_hash?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          operation_type?: string
+          push_type?: string | null
+          source_repo_id?: string | null
+          status?: string
+          target_repo_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "git_operations_log_source_repo_id_fkey"
+            columns: ["source_repo_id"]
+            isOneToOne: false
+            referencedRelation: "repositories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "git_operations_log_target_repo_id_fkey"
+            columns: ["target_repo_id"]
+            isOneToOne: false
+            referencedRelation: "repositories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       repositories: {
         Row: {
           branches: Json | null

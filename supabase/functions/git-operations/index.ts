@@ -7,6 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Enhanced logging utility
 const log = {
   success: (message: string, data?: any) => {
     console.log('\x1b[32m%s\x1b[0m', '✓ SUCCESS:', message);
@@ -33,6 +34,27 @@ const log = {
   }
 };
 
+// Parse GitHub URL to extract owner and repo
+const parseGitHubUrl = (url: string) => {
+  try {
+    const regex = /github\.com\/([^\/]+)\/([^\/\.]+)/;
+    const match = url.match(regex);
+    
+    if (!match) {
+      throw new Error(`Invalid GitHub URL: ${url}`);
+    }
+
+    return {
+      owner: match[1],
+      repo: match[2].replace('.git', '')
+    };
+  } catch (error) {
+    log.error('Error parsing GitHub URL:', error);
+    throw error;
+  }
+};
+
+// Get repository details including branches and commits
 async function getRepoDetails(url: string, octokit: Octokit) {
   const logs = [];
   try {
@@ -76,25 +98,7 @@ async function getRepoDetails(url: string, octokit: Octokit) {
   }
 }
 
-const parseGitHubUrl = (url: string) => {
-  try {
-    const regex = /github\.com\/([^\/]+)\/([^\/\.]+)/;
-    const match = url.match(regex);
-    
-    if (!match) {
-      throw new Error(`Invalid GitHub URL: ${url}`);
-    }
-
-    return {
-      owner: match[1],
-      repo: match[2].replace('.git', '')
-    };
-  } catch (error) {
-    log.error('Error parsing GitHub URL:', error);
-    throw error;
-  }
-};
-
+// Create or update Git reference
 async function createOrUpdateRef(octokit: Octokit, owner: string, repo: string, ref: string, sha: string, force: boolean) {
   try {
     // First try to get the reference
@@ -130,15 +134,10 @@ async function createOrUpdateRef(octokit: Octokit, owner: string, repo: string, 
   }
 }
 
+// Main server function
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      headers: {
-        ...corsHeaders,
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      }
-    });
+    return new Response(null, { headers: corsHeaders });
   }
 
   const logs = [];
@@ -151,6 +150,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // Create operation log entry
+    const { data: operationLog, error: logError } = await supabaseClient
+      .from('git_operations_log')
+      .insert({
+        source_repo_id: sourceRepoId,
+        target_repo_id: targetRepoId,
+        operation_type: type,
+        push_type: pushType,
+        status: 'started'
+      })
+      .select()
+      .single();
+
+    if (logError) {
+      logs.push(log.error('Error creating operation log', logError));
+      throw logError;
+    }
 
     const githubToken = Deno.env.get('GITHUB_ACCESS_TOKEN');
     if (!githubToken) {
@@ -235,10 +252,31 @@ serve(async (req) => {
           })
           .eq('id', targetRepoId);
 
+        // Update operation log
+        await supabaseClient
+          .from('git_operations_log')
+          .update({
+            status: 'completed',
+            commit_hash: sourceCommit.sha,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', operationLog.id);
+
         logs.push(log.success('Repository status updated in database'));
 
       } catch (error) {
         logs.push(log.error('Push operation failed', error));
+        
+        // Update operation log with error
+        await supabaseClient
+          .from('git_operations_log')
+          .update({
+            status: 'failed',
+            error_message: error.message || 'Unknown error occurred',
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', operationLog.id);
+          
         throw error;
       }
     }
