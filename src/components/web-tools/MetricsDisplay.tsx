@@ -1,7 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { WebMetricsD3 } from "@/components/visualizations/WebMetricsD3";
-import { WebMetricsP5 } from "@/components/visualizations/WebMetricsP5";
-import { WebMetricsHighcharts } from "@/components/visualizations/WebMetricsHighcharts";
 
 interface MetricsDisplayProps {
   metrics: Array<{ metric: string; value: string }>;
@@ -64,13 +61,6 @@ export const MetricsDisplay = ({ metrics }: MetricsDisplayProps) => {
           </div>
         </CardContent>
       </Card>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <WebMetricsD3 data={metrics} />
-        <WebMetricsHighcharts data={metrics} />
-      </div>
-      
-      <WebMetricsP5 data={metrics} />
     </div>
   );
 };

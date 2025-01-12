@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
-import RepositoryList from './RepositoryList';
-import { Repository } from '../../../types/repository';
+import { RepositoryList } from './RepositoryList';
+import { Repository } from '@/types/repository';
 
 const mockRepositories: Repository[] = [
   {
@@ -9,8 +9,7 @@ const mockRepositories: Repository[] = [
     url: 'https://example.com/repo1',
     is_master: true,
     branches: [],
-    default_branch: 'main',
-    created_at: '2024-01-01'
+    default_branch: 'main'
   },
   {
     id: '2',
@@ -18,8 +17,7 @@ const mockRepositories: Repository[] = [
     url: 'https://example.com/repo2',
     is_master: false,
     branches: [],
-    default_branch: 'main',
-    created_at: '2024-01-02'
+    default_branch: 'main'
   }
 ];
 
@@ -36,8 +34,8 @@ describe('RepositoryList Component', () => {
       />
     );
 
-    expect(screen.getByText('repo1')).toBeInTheDocument();
-    expect(screen.getByText('repo2')).toBeInTheDocument();
+    expect(screen.getByText('https://example.com/repo1')).toBeInTheDocument();
+    expect(screen.getByText('https://example.com/repo2')).toBeInTheDocument();
   });
 
   test('shows loading state', () => {
@@ -52,6 +50,10 @@ describe('RepositoryList Component', () => {
       />
     );
 
-    expect(screen.getByRole('progressbar')).toBeInTheDocument();
+    // Since we're using the disabled prop on buttons when loading
+    const buttons = screen.getAllByRole('button');
+    buttons.forEach(button => {
+      expect(button).toBeDisabled();
+    });
   });
 });

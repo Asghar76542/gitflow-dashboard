@@ -1,57 +1,87 @@
-import { useState } from "react";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/AppSidebar";
+import { useState, useEffect } from "react";
 import { WebMetricsForm } from "@/components/web-tools/WebMetricsForm";
 import { MetricsDisplay } from "@/components/web-tools/MetricsDisplay";
-import { ConsoleOutput } from "@/components/web-tools/ConsoleOutput";
+import { DetailedWebMetricsD3 } from "@/components/visualizations/DetailedWebMetricsD3";
+import { DetailedWebMetricsHighcharts } from "@/components/visualizations/DetailedWebMetricsHighcharts";
+import { DetailedWebMetricsP5 } from "@/components/visualizations/DetailedWebMetricsP5";
+import { MonitoringPanel } from "@/components/web-tools/MonitoringPanel";
+import { UrlHistory } from "@/components/web-tools/UrlHistory";
+import { useToast } from "@/components/ui/use-toast";
+import { analyzeWebsite } from "@/utils/websiteAnalyzer";
 
-const WebTools = () => {
-  const [isLoading, setIsLoading] = useState(false);
+const MAX_HISTORY = 5;
+const URL_HISTORY_KEY = 'url-history';
+
+export default function WebTools() {
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [metrics, setMetrics] = useState<Array<{ metric: string; value: string }>>([]);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [isMonitoring, setIsMonitoring] = useState(false);
+  const [urlHistory, setUrlHistory] = useState<string[]>([]);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const savedHistory = localStorage.getItem(URL_HISTORY_KEY);
+    if (savedHistory) {
+      setUrlHistory(JSON.parse(savedHistory));
+    }
+  }, []);
+
+  const addToHistory = (url: string) => {
+    const newHistory = [url, ...urlHistory.filter(u => u !== url)].slice(0, MAX_HISTORY);
+    setUrlHistory(newHistory);
+    localStorage.setItem(URL_HISTORY_KEY, JSON.stringify(newHistory));
+  };
 
   const handleAnalyze = async (url: string) => {
-    setIsLoading(true);
+    setIsAnalyzing(true);
     try {
-      // Mock data for demonstration - replace with actual API call
-      const mockMetrics = [
-        { metric: "Page Load Time", value: "2.3s" },
-        { metric: "Page Size", value: "1.2MB" },
-        { metric: "Meta Description", value: "Present" },
-        { metric: "H1 Tag", value: "Present" },
-        { metric: "HTTPS", value: "Yes" },
-        { metric: "Image Alt Tags", value: "Present" }
-      ];
-      
-      setMetrics(mockMetrics);
-      setLogs([`[${new Date().toLocaleTimeString()}] Analyzing ${url}...`]);
+      const results = await analyzeWebsite(url);
+      setMetrics(results);
+      addToHistory(url);
+      toast({
+        title: "Analysis Complete",
+        description: "Website metrics have been analyzed successfully.",
+      });
     } catch (error) {
-      setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Error: ${error}`]);
+      toast({
+        title: "Analysis Failed",
+        description: error instanceof Error ? error.message : "Failed to analyze website",
+        variant: "destructive",
+      });
     } finally {
-      setIsLoading(false);
+      setIsAnalyzing(false);
     }
   };
 
-  return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full">
-        <AppSidebar />
-        <main className="flex-1 p-6">
-          <div className="container mx-auto">
-            <div className="flex justify-between items-center mb-8">
-              <h1 className="text-3xl font-bold">Web Development Tools</h1>
-              <SidebarTrigger className="md:hidden" />
-            </div>
-            <div className="grid gap-6">
-              <WebMetricsForm onAnalyze={handleAnalyze} isLoading={isLoading} />
-              <MetricsDisplay metrics={metrics} />
-              <ConsoleOutput logs={logs} />
-            </div>
-          </div>
-        </main>
-      </div>
-    </SidebarProvider>
-  );
-};
+  const toggleMonitoring = () => {
+    setIsMonitoring(!isMonitoring);
+  };
 
-export default WebTools;
+  return (
+    <div className="container mx-auto px-4 py-8 space-y-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2">
+          <WebMetricsForm onAnalyze={handleAnalyze} isLoading={isAnalyzing} />
+        </div>
+        <div>
+          <UrlHistory urls={urlHistory} onSelectUrl={handleAnalyze} />
+        </div>
+      </div>
+
+      {metrics.length > 0 && (
+        <div className="space-y-8">
+          <MetricsDisplay metrics={metrics} />
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <DetailedWebMetricsD3 data={metrics} />
+            <DetailedWebMetricsHighcharts data={metrics} />
+          </div>
+          
+          <DetailedWebMetricsP5 data={metrics} />
+          
+          <MonitoringPanel isMonitoring={isMonitoring} onToggleMonitoring={toggleMonitoring} />
+        </div>
+      )}
+    </div>
+  );
+}
