@@ -92,6 +92,7 @@ async function ensureRef(octokit: Octokit, owner: string, repo: string, ref: str
   try {
     logs.push(log.info('Ensuring reference exists', { owner, repo, ref, sha, force }));
     
+    let refExists = false;
     try {
       // Try to get the reference first
       await octokit.rest.git.getRef({
@@ -99,9 +100,17 @@ async function ensureRef(octokit: Octokit, owner: string, repo: string, ref: str
         repo,
         ref: ref.replace('refs/', '')
       });
-      
-      // If we get here, the reference exists, so update it
-      logs.push(log.info('Reference exists, updating it', { ref }));
+      refExists = true;
+    } catch (error) {
+      if (error.status !== 404) {
+        throw error;
+      }
+      // 404 means ref doesn't exist, which is fine - we'll create it
+    }
+
+    if (refExists) {
+      // If reference exists, update it
+      logs.push(log.info('Reference exists, updating it', { ref, force }));
       const updateResponse = await octokit.rest.git.updateRef({
         owner,
         repo,
@@ -112,22 +121,18 @@ async function ensureRef(octokit: Octokit, owner: string, repo: string, ref: str
       
       logs.push(log.success('Reference updated successfully', { ref: updateResponse.data.ref }));
       return updateResponse;
+    } else {
+      // Reference doesn't exist, create it
+      logs.push(log.info('Reference does not exist, creating it', { ref }));
+      const createResponse = await octokit.rest.git.createRef({
+        owner,
+        repo,
+        ref,
+        sha
+      });
       
-    } catch (error) {
-      if (error.status === 404) {
-        // Reference doesn't exist, create it
-        logs.push(log.info('Reference does not exist, creating it', { ref }));
-        const createResponse = await octokit.rest.git.createRef({
-          owner,
-          repo,
-          ref,
-          sha
-        });
-        
-        logs.push(log.success('Reference created successfully', { ref: createResponse.data.ref }));
-        return createResponse;
-      }
-      throw error;
+      logs.push(log.success('Reference created successfully', { ref: createResponse.data.ref }));
+      return createResponse;
     }
   } catch (error) {
     logs.push(log.error('Error ensuring reference', error));
