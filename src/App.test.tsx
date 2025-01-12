@@ -8,8 +8,8 @@ jest.mock('d3', () => ({
   axisLeft: jest.fn()
 }));
 
-test('renders learn react link', () => {
+test('renders repositories link', () => {
   render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
+  const linkElement = screen.getByRole('link', { name: /Repositories/i });
   expect(linkElement).toBeInTheDocument();
 });
