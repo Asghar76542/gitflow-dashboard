@@ -87,69 +87,45 @@ async function getRepoDetails(url: string, octokit: Octokit) {
   }
 }
 
-async function createRef(octokit: Octokit, owner: string, repo: string, ref: string, sha: string) {
-  const logs = [];
-  try {
-    logs.push(log.info('Creating new reference', { ref, sha }));
-    
-    const response = await octokit.rest.git.createRef({
-      owner,
-      repo,
-      ref,
-      sha
-    });
-    
-    logs.push(log.success('Reference created successfully', { ref: response.data.ref }));
-    return { response, logs };
-  } catch (error) {
-    logs.push(log.error('Error creating reference', error));
-    throw { error, logs };
-  }
-}
-
-async function updateRef(octokit: Octokit, owner: string, repo: string, ref: string, sha: string, force: boolean) {
-  const logs = [];
-  try {
-    logs.push(log.info('Updating reference', { ref, sha, force }));
-    
-    const response = await octokit.rest.git.updateRef({
-      owner,
-      repo,
-      ref: ref.replace('refs/', ''),
-      sha,
-      force
-    });
-    
-    logs.push(log.success('Reference updated successfully', { ref: response.data.ref }));
-    return { response, logs };
-  } catch (error) {
-    logs.push(log.error('Error updating reference', error));
-    throw { error, logs };
-  }
-}
-
 async function ensureRef(octokit: Octokit, owner: string, repo: string, ref: string, sha: string, force: boolean) {
   const logs = [];
   try {
-    // Try to get the reference first
+    logs.push(log.info('Ensuring reference exists', { owner, repo, ref, sha, force }));
+    
     try {
+      // Try to get the reference first
       await octokit.rest.git.getRef({
         owner,
         repo,
         ref: ref.replace('refs/', '')
       });
       
-      // Reference exists, update it
-      const updateResult = await updateRef(octokit, owner, repo, ref, sha, force);
-      logs.push(...updateResult.logs);
-      return updateResult.response;
+      // If we get here, the reference exists, so update it
+      logs.push(log.info('Reference exists, updating it', { ref }));
+      const updateResponse = await octokit.rest.git.updateRef({
+        owner,
+        repo,
+        ref: ref.replace('refs/', ''),
+        sha,
+        force
+      });
+      
+      logs.push(log.success('Reference updated successfully', { ref: updateResponse.data.ref }));
+      return updateResponse;
       
     } catch (error) {
       if (error.status === 404) {
         // Reference doesn't exist, create it
-        const createResult = await createRef(octokit, owner, repo, ref, sha);
-        logs.push(...createResult.logs);
-        return createResult.response;
+        logs.push(log.info('Reference does not exist, creating it', { ref }));
+        const createResponse = await octokit.rest.git.createRef({
+          owner,
+          repo,
+          ref,
+          sha
+        });
+        
+        logs.push(log.success('Reference created successfully', { ref: createResponse.data.ref }));
+        return createResponse;
       }
       throw error;
     }
@@ -245,7 +221,7 @@ serve(async (req) => {
         date: sourceCommit.date
       }));
 
-      // Update target repository with proper force parameter based on pushType
+      // Update target repository
       const { owner: targetOwner, repo: targetRepoName } = parseGitHubUrl(targetRepo.url);
       const branchRef = `refs/heads/${targetRepo.default_branch || 'main'}`;
       
