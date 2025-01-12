@@ -19,8 +19,12 @@ const Index = () => {
             </div>
             
             <HeroSection />
-            <FeatureGrid />
-            <RepoManager />
+            <section aria-label="Features" role="region">
+              <FeatureGrid />
+            </section>
+            <section aria-label="Repository Manager" role="region">
+              <RepoManager />
+            </section>
           </div>
         </main>
       </div>

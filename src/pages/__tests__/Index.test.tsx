@@ -16,15 +16,15 @@ describe('Index', () => {
     render(<Index />)
     
     const featureGrid = screen.getByRole('region', { name: /features/i })
-    expect(within(featureGrid).getByText(/features/i)).toBeInTheDocument()
+    expect(within(featureGrid).getByRole('heading', { name: /features/i, level: 2 })).toBeInTheDocument()
     expect(within(featureGrid).getAllByRole('img')).toHaveLength(3)
   })
 
   it('renders the repo manager', () => {
     render(<Index />)
     
-    const repoManager = screen.getByRole('region', { name: /repositories/i })
-    expect(within(repoManager).getByText(/repositories/i)).toBeInTheDocument()
+    const repoManager = screen.getByRole('region', { name: /repository manager/i })
+    expect(within(repoManager).getByRole('heading', { name: /repository manager/i, level: 2 })).toBeInTheDocument()
     expect(within(repoManager).getByRole('button', { name: /add repository/i })).toBeInTheDocument()
   })
 })
