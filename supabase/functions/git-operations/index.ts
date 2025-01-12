@@ -16,15 +16,7 @@ const log = {
   },
   error: (message: string, error?: any) => {
     console.error('\x1b[31m%s\x1b[0m', '✗ ERROR:', message);
-    if (error) {
-      console.error('\x1b[31m%s\x1b[0m', '  Details:');
-      if (error.status) console.error('\x1b[31m%s\x1b[0m', `  Status: ${error.status}`);
-      if (error.message) console.error('\x1b[31m%s\x1b[0m', `  Message: ${error.message}`);
-      if (error.response?.data) {
-        console.error('\x1b[31m%s\x1b[0m', '  Response Data:');
-        console.error(JSON.stringify(error.response.data, null, 2));
-      }
-    }
+    if (error) console.error(error);
     return { type: 'error', message, error, timestamp: new Date().toISOString() };
   },
   info: (message: string, data?: any) => {
@@ -34,7 +26,6 @@ const log = {
   }
 };
 
-// Parse GitHub URL to extract owner and repo
 const parseGitHubUrl = (url: string) => {
   try {
     const regex = /github\.com\/([^\/]+)\/([^\/\.]+)/;
@@ -54,7 +45,6 @@ const parseGitHubUrl = (url: string) => {
   }
 };
 
-// Get repository details including branches and commits
 async function getRepoDetails(url: string, octokit: Octokit) {
   const logs = [];
   try {
@@ -98,28 +88,32 @@ async function getRepoDetails(url: string, octokit: Octokit) {
   }
 }
 
-// Create or update Git reference
-async function createOrUpdateRef(octokit: Octokit, owner: string, repo: string, ref: string, sha: string, force: boolean) {
+async function ensureRef(octokit: Octokit, owner: string, repo: string, ref: string, sha: string) {
+  const logs = [];
   try {
-    // First try to get the reference
+    // Try to get the reference first
     try {
-      await octokit.rest.git.getRef({
+      const { data: refData } = await octokit.rest.git.getRef({
         owner,
         repo,
         ref: ref.replace('refs/', '')
       });
       
-      // If reference exists, update it
+      logs.push(log.info('Reference exists, updating it', { ref: refData.ref }));
+      
+      // Update existing reference
       return await octokit.rest.git.updateRef({
         owner,
         repo,
         ref: ref.replace('refs/', ''),
         sha,
-        force
+        force: false
       });
     } catch (error) {
       if (error.status === 404) {
-        // If reference doesn't exist, create it
+        logs.push(log.info('Reference does not exist, creating it', { ref }));
+        
+        // Create new reference if it doesn't exist
         return await octokit.rest.git.createRef({
           owner,
           repo,
@@ -130,11 +124,11 @@ async function createOrUpdateRef(octokit: Octokit, owner: string, repo: string, 
       throw error;
     }
   } catch (error) {
-    throw error;
+    logs.push(log.error('Error ensuring reference', error));
+    throw { error, logs };
   }
 }
 
-// Main server function
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -226,19 +220,18 @@ serve(async (req) => {
       const branchRef = `refs/heads/${targetRepo.default_branch || 'main'}`;
       
       try {
-        const updateRef = await createOrUpdateRef(
+        const result = await ensureRef(
           octokit,
           targetOwner,
           targetRepoName,
           branchRef,
-          sourceCommit.sha,
-          pushType === 'force' || pushType === 'force-with-lease'
+          sourceCommit.sha
         );
 
         logs.push(log.success('Push operation completed', {
           targetRepo: targetRepo.url,
-          ref: updateRef.data.ref,
-          sha: updateRef.data.object.sha
+          ref: result.data.ref,
+          sha: result.data.object.sha
         }));
 
         // Update repository status in database
@@ -281,51 +274,6 @@ serve(async (req) => {
       }
     }
 
-    if (type === 'getLastCommit') {
-      logs.push(log.info('Getting repository details', { sourceRepoId }));
-      
-      const { data: repoData, error: repoError } = await supabaseClient
-        .from('repositories')
-        .select('url')
-        .eq('id', sourceRepoId)
-        .single();
-
-      if (repoError) {
-        logs.push(log.error('Error fetching repository', repoError));
-        throw repoError;
-      }
-
-      if (!repoData?.url) {
-        logs.push(log.error('Repository URL not found'));
-        throw new Error('Repository URL not found');
-      }
-
-      const repoDetails = await getRepoDetails(repoData.url, octokit);
-      logs.push(...repoDetails.logs);
-
-      const lastCommit = repoDetails.details.lastCommits[0];
-      
-      const { error: updateError } = await supabaseClient
-        .from('repositories')
-        .update({
-          last_commit: lastCommit.sha,
-          last_commit_date: lastCommit.date,
-          last_sync: new Date().toISOString(),
-          status: 'synced',
-          default_branch: repoDetails.details.defaultBranch,
-          branches: repoDetails.details.branches,
-          recent_commits: repoDetails.details.lastCommits
-        })
-        .eq('id', sourceRepoId);
-
-      if (updateError) {
-        logs.push(log.error('Error updating repository', updateError));
-        throw updateError;
-      }
-
-      logs.push(log.success('Repository updated successfully'));
-    }
-
     return new Response(
       JSON.stringify({ 
         success: true,
@@ -348,11 +296,7 @@ serve(async (req) => {
         success: false,
         error: error.message || 'Unknown error occurred',
         logs,
-        details: {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        }
+        details: error
       }),
       { 
         headers: { 
