@@ -87,10 +87,47 @@ async function getRepoDetails(url: string, octokit: Octokit) {
   }
 }
 
+async function verifyCommitExists(octokit: Octokit, owner: string, repo: string, sha: string) {
+  try {
+    await octokit.rest.git.getCommit({
+      owner,
+      repo,
+      commit_sha: sha
+    });
+    return true;
+  } catch (error) {
+    if (error.status === 404) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 async function ensureRef(octokit: Octokit, owner: string, repo: string, ref: string, sha: string, force: boolean) {
   const logs = [];
   try {
     logs.push(log.info('Ensuring reference exists', { owner, repo, ref, sha, force }));
+    
+    // First verify the commit exists in the target repository
+    const commitExists = await verifyCommitExists(octokit, owner, repo, sha);
+    if (!commitExists) {
+      logs.push(log.info('Commit does not exist in target repository, fetching it', { sha }));
+      
+      // Get the commit from source repository and create it in target
+      const commit = await octokit.rest.git.getCommit({
+        owner,
+        repo,
+        commit_sha: sha
+      });
+      
+      await octokit.rest.git.createCommit({
+        owner,
+        repo,
+        message: commit.data.message,
+        tree: commit.data.tree.sha,
+        parents: commit.data.parents.map(p => p.sha)
+      });
+    }
     
     let refData = null;
     try {
