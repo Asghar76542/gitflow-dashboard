@@ -92,23 +92,24 @@ async function ensureRef(octokit: Octokit, owner: string, repo: string, ref: str
   try {
     logs.push(log.info('Ensuring reference exists', { owner, repo, ref, sha, force }));
     
-    let refExists = false;
+    let refData = null;
     try {
-      const { data } = await octokit.rest.git.getRef({
+      const response = await octokit.rest.git.getRef({
         owner,
         repo,
         ref: ref.replace('refs/', '')
       });
-      refExists = true;
-      logs.push(log.info('Reference check successful', { ref, exists: true }));
+      refData = response.data;
+      logs.push(log.info('Reference exists', { ref, currentSha: refData.object.sha }));
     } catch (error) {
-      if (error.status !== 404) {
+      if (error.status === 404) {
+        logs.push(log.info('Reference does not exist, will create it', { ref }));
+      } else {
         throw error;
       }
-      logs.push(log.info('Reference does not exist', { ref }));
     }
 
-    if (refExists) {
+    if (refData) {
       logs.push(log.info('Updating existing reference', { ref, sha, force }));
       const updateResponse = await octokit.rest.git.updateRef({
         owner,
