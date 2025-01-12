@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">53.84% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>7/13</span>
+                <span class='fraction'>0/13</span>
             </div>
         
             
@@ -37,16 +37,16 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/4</span>
+                <span class='fraction'>0/4</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">58.33% </span>
+                <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/12</span>
+                <span class='fraction'>0/12</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line low'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -82,34 +82,34 @@
 <a name='L17'></a><a href='#L17'>17</a>
 <a name='L18'></a><a href='#L18'>18</a>
 <a name='L19'></a><a href='#L19'>19</a>
-<a name='L20'></a><a href='#L20'>20</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L20'></a><a href='#L20'>20</a></td><td class="line-coverage quiet"><span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import * as React from "react"
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js"><span class="cstat-no" title="statement not covered" >import * as React from "react"</span>
 &nbsp;
-const MOBILE_BREAKPOINT = 768
+const MOBILE_BREAKPOINT = <span class="cstat-no" title="statement not covered" >768</span>
 &nbsp;
-export function useIsMobile() {
-  const [isMobile, setIsMobile] = React.useState&lt;boolean | undefined&gt;(undefined)
+<span class="cstat-no" title="statement not covered" >export function <span class="fstat-no" title="function not covered" >u</span>seIsMobile(</span>) {
+  const [isMobile, setIsMobile] = <span class="cstat-no" title="statement not covered" >React.useState&lt;boolean | undefined&gt;(undefined)</span>
 &nbsp;
-  React.useEffect(() =&gt; {
-    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+<span class="cstat-no" title="statement not covered" >  React.useEffect(<span class="fstat-no" title="function not covered" >() =</span>&gt; {</span>
+    const mql = <span class="cstat-no" title="statement not covered" >window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)</span>
     const onChange = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >() =</span>&gt; {</span>
 <span class="cstat-no" title="statement not covered" >      setIsMobile(window.innerWidth &lt; MOBILE_BREAKPOINT)</span>
     }
@@ -118,7 +118,7 @@ export function useIsMobile() {
 <span class="cstat-no" title="statement not covered" >    return <span class="fstat-no" title="function not covered" >() =</span>&gt; <span class="cstat-no" title="statement not covered" >mql.removeEventListener("change", onChange)</span></span>
   }, [])
 &nbsp;
-  return !!isMobile
+<span class="cstat-no" title="statement not covered" >  return !!isMobile</span>
 }
 &nbsp;</pre></td></tr></table></pre>
 
@@ -127,7 +127,7 @@ export function useIsMobile() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-01-11T22:10:45.217Z
+                at 2025-01-12T01:16:39.058Z
             </div>
         <script src="../../prettify.js"></script>
         <script>
