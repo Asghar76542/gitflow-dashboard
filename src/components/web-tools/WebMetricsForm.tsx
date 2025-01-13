@@ -5,9 +5,10 @@ import { useToast } from "@/components/ui/use-toast";
 
 interface WebMetricsFormProps {
   onAnalyze: (url: string) => void;
+  isLoading?: boolean;
 }
 
-const WebMetricsForm: React.FC<WebMetricsFormProps> = ({ onAnalyze }) => {
+export const WebMetricsForm: React.FC<WebMetricsFormProps> = ({ onAnalyze, isLoading }) => {
   const [url, setUrl] = useState("");
   const { toast } = useToast();
 
@@ -50,9 +51,9 @@ const WebMetricsForm: React.FC<WebMetricsFormProps> = ({ onAnalyze }) => {
         placeholder="Enter website URL"
         className="flex-1"
       />
-      <Button type="submit">Analyze</Button>
+      <Button type="submit" disabled={isLoading}>
+        {isLoading ? "Analyzing..." : "Analyze"}
+      </Button>
     </form>
   );
 };
-
-export default WebMetricsForm;
