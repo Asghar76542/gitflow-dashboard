@@ -1,15 +1,15 @@
-import { useState } from "react";
-import { Input } from "@/components/ui/input";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
 
 interface WebMetricsFormProps {
   onAnalyze: (url: string) => void;
-  isLoading: boolean;
 }
 
-export const WebMetricsForm = ({ onAnalyze, isLoading }: WebMetricsFormProps) => {
+const WebMetricsForm: React.FC<WebMetricsFormProps> = ({ onAnalyze }) => {
   const [url, setUrl] = useState("");
+  const { toast } = useToast();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,44 +17,42 @@ export const WebMetricsForm = ({ onAnalyze, isLoading }: WebMetricsFormProps) =>
     try {
       // Clean and validate the URL
       let cleanUrl = url.trim();
+      
+      // Add protocol if missing
       if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
         cleanUrl = 'https://' + cleanUrl;
       }
       
-      // Remove any trailing colons or slashes
-      cleanUrl = cleanUrl.replace(/[:\/]+$/, '');
+      // Remove trailing colons and slashes
+      cleanUrl = cleanUrl.replace(/[:/]+$/, '');
       
-      // Create URL object to validate format
-      new URL(cleanUrl);
+      // Validate URL format
+      const urlObject = new URL(cleanUrl);
       
-      console.log('Analyzing URL:', cleanUrl);
-      onAnalyze(cleanUrl);
+      console.log('Analyzing URL:', urlObject.toString());
+      onAnalyze(urlObject.toString());
     } catch (error) {
       console.error('Invalid URL format:', error);
-      // You might want to show a toast or error message here
+      toast({
+        variant: "destructive",
+        title: "Invalid URL",
+        description: "Please enter a valid website URL",
+      });
     }
   };
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Website Analysis Tool</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Input
-            type="url"
-            placeholder="Enter website URL"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            className="flex-1"
-            required
-          />
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Analyzing..." : "Analyze"}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+    <form onSubmit={handleSubmit} className="flex gap-4 items-center">
+      <Input
+        type="text"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="Enter website URL"
+        className="flex-1"
+      />
+      <Button type="submit">Analyze</Button>
+    </form>
   );
 };
+
+export default WebMetricsForm;
