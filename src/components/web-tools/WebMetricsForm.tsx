@@ -13,7 +13,26 @@ export const WebMetricsForm = ({ onAnalyze, isLoading }: WebMetricsFormProps) =>
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onAnalyze(url);
+    
+    try {
+      // Clean and validate the URL
+      let cleanUrl = url.trim();
+      if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+        cleanUrl = 'https://' + cleanUrl;
+      }
+      
+      // Remove any trailing colons or slashes
+      cleanUrl = cleanUrl.replace(/[:\/]+$/, '');
+      
+      // Create URL object to validate format
+      new URL(cleanUrl);
+      
+      console.log('Analyzing URL:', cleanUrl);
+      onAnalyze(cleanUrl);
+    } catch (error) {
+      console.error('Invalid URL format:', error);
+      // You might want to show a toast or error message here
+    }
   };
 
   return (
